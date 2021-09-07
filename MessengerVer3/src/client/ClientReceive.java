@@ -79,13 +79,6 @@ public class ClientReceive extends Receive implements Runnable {
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
-			} else if(message.contains("@invite")) {
-//				String roomId = message.split("@invite")[1];
-//				messenger.createDisplay();
-//				messenger.setDisplay();
-//				messenger.setTitle(roomId);
-//				messenger.showDisplay();
-//				messenger.messageField.requestFocus();
 			}
 		}
 	}

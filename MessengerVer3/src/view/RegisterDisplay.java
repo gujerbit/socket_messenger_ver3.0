@@ -16,6 +16,7 @@ public class RegisterDisplay extends Display {
 	public JTextField inputUserPassword = new JTextField();
 	public JTextField inputUserName = new JTextField();
 	public JButton register = new JButton("회원가입");
+	public JButton cancle = new JButton("취소");
 
 	@Override
 	public void setDisplay() {
@@ -28,6 +29,7 @@ public class RegisterDisplay extends Display {
 		frame.add(tip3);
 		frame.add(inputUserName);
 		frame.add(register);
+		frame.add(cancle);
 	}
 
 	public void closeDisplay() {

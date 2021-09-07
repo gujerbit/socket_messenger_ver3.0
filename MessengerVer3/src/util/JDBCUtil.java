@@ -8,7 +8,7 @@ import java.sql.ResultSet;
 public class JDBCUtil {
 	
 	public static Connection getConnection() throws Exception {
-		Class.forName("com.mysql.jdbc.Driver");
+		Class.forName("com.mysql.cj.jdbc.Driver");
 		Connection con = DriverManager.getConnection("jdbc:mysql://localhost:3306/jun?useSSL=false", "jun", "elsh1122!");
 		
 		return con;

@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
+import dao.RoomDAO;
 import model.Receive;
 import model.Send;
 import vo.RoomVO;
@@ -36,12 +37,13 @@ public class ServerReceive extends Receive implements Runnable {
 	public void run() {
 		while (true) {
 			try {
-				if(userExit) break;
-				
+				if (userExit)
+					break;
+
 				input = client.getInputStream();
 				data = new DataInputStream(input);
 				String message = data.readUTF();
-				
+
 				protocolRead(message.toString());
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -53,13 +55,13 @@ public class ServerReceive extends Receive implements Runnable {
 	protected void protocolRead(String message) {
 		String[] decodeMessage = null;
 		String sendMessage = "";
-		
-		if(fileUploading) {
-			if(message.contains("@finish")) {
+
+		if (fileUploading) {
+			if (message.contains("@finish")) {
 				fileUploading = false;
-				
+
 				try {
-					for(String key : clients.keySet()) {
+					for (String key : clients.keySet()) {
 						Thread thread = new Thread(new Send(clients.get(key), "@fileserver/" + fileName + "@roomId"));
 						thread.start();
 						thread.join();
@@ -67,7 +69,7 @@ public class ServerReceive extends Receive implements Runnable {
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
-				
+
 				sendMessage = "[" + name + " : " + "output/" + fileName + "]";
 				setContent(roomId, sendMessage);
 			} else {
@@ -82,6 +84,7 @@ public class ServerReceive extends Receive implements Runnable {
 				decodeMessage = message.split("@join");
 				name = decodeMessage[0];
 				roomId = decodeMessage[1];
+				
 				sendMessage = "[Server Message : " + name + "님이 " + roomId + "방에 입장하셨습니다.]";
 
 				if (globalClients.isEmpty() || !globalClients.containsKey(name)) {
@@ -94,45 +97,59 @@ public class ServerReceive extends Receive implements Runnable {
 				name = decodeMessage[0];
 				roomId = decodeMessage[1];
 				sendMessage = "[Server Message : " + name + "님이" + roomId + "방을 나가셨습니다.]";
-				
+
 				RoomVO vo = rooms.get(roomId);
 				Map<String, Socket> clients = vo.getClients();
 				clients.remove(name);
 				vo.setClients(clients);
 				rooms.put(roomId, vo);
-				
-				if(clients.isEmpty()) {
+
+				if (clients.isEmpty()) {
 					rooms.remove(roomId);
 				} else {
 					setContent(roomId, sendMessage);
 				}
-				
+
 				boolean userEmpty = true;
-				
-				if(!rooms.isEmpty()) {
-					for(String key : rooms.keySet()) {
+
+				if (!rooms.isEmpty()) {
+					for (String key : rooms.keySet()) {
 						vo = rooms.get(key);
 						clients = vo.getClients();
-						
-						if(clients.containsKey(name)) userEmpty = false;
+
+						if (clients.containsKey(name))
+							userEmpty = false;
 					}
 				}
-				
-				if(userEmpty) {
+
+				if (userEmpty) {
 					globalClients.remove(name);
-					
+
 					Thread thread = new Thread(new Send(client, "@exit"));
 					thread.start();
 				}
-				
+
 				update();
-				
+
 				userExit = true;
+				
+				RoomDAO dao = RoomDAO.getInstance();
+				
+				if(dao.disconnectUser(roomId, name.split("\\(")[1].split("\\)")[0]) <= 0) {
+					System.out.println("disconnect faild!");
+				}
 			} else if (message.contains("@message")) {
 				decodeMessage = message.split("@message");
 				name = decodeMessage[0];
 				roomId = decodeMessage[1].split("@roomId")[1];
-				sendMessage = "[" + name + " : " + decodeMessage[1].split("@roomId")[0] + "]";
+				String msg = decodeMessage[1].split("@roomId")[0];
+				sendMessage = "[" + name + " : " + msg + "]";
+				
+				RoomDAO dao = RoomDAO.getInstance();
+				
+				if(dao.recordMessage(roomId, name.split("\\(")[1].split("\\)")[0], msg) <= 0) {
+					System.out.println("기록 실패");
+				}
 
 				setContent(roomId, sendMessage);
 			} else if (message.contains("@file")) {
@@ -143,13 +160,24 @@ public class ServerReceive extends Receive implements Runnable {
 				File file = new File(dir);
 				fileName = file.getName();
 				fileUploading = true;
+				sendMessage = "[" + name + " : " + fileName + "]";
+				setContent(roomId, sendMessage);
+				RoomDAO dao = RoomDAO.getInstance();
 				
+				if(dao.recordMessage(roomId, name.split("\\(")[1].split("\\)")[0], sendMessage) <= 0) {
+					System.out.println("기록 실패");
+				}
+
 				try {
 					fos = new FileOutputStream("server/" + fileName);
+					
+					if(dao.recordMessage(roomId, name.split("\\(")[1].split("\\)")[0], fileName) <= 0) {
+						System.out.println("기록 실패");
+					}
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
-			} else if(message.contains("@invite")) {
+			} else if (message.contains("@invite")) {
 //				decodeMessage = message.split("@invite");
 //				name = decodeMessage[0];
 //				roomId = decodeMessage[1];
@@ -170,14 +198,14 @@ public class ServerReceive extends Receive implements Runnable {
 	protected void update() {
 		try {
 			clearLocal();
-			
+
 			for (String key : rooms.keySet()) {
 				RoomVO vo = rooms.get(key);
 				Map<String, Socket> clients = vo.getClients();
 
 				clearGlobal(clients);
 			}
-			
+
 			for (String key : clients.keySet()) { // 현재 방
 				messageSetting(key);
 				currentUserSetting(key);
@@ -212,19 +240,25 @@ public class ServerReceive extends Receive implements Runnable {
 		messages.add(sendMessage);
 		vo = new RoomVO(clients, messages);
 		rooms.put(roomId, vo);
-		
+
+		RoomDAO dao = RoomDAO.getInstance();
+
+		if (dao.connectUser(roomId, name.split("\\(")[1].split("\\)")[0]) <= 0) {
+			System.out.println("중복된 값!");
+		}
+
 		update();
 	}
-	
+
 	private void setContent(String roomId, String sendMessage) {
 		vo = rooms.get(roomId);
 		clients = vo.getClients();
 		messages = vo.getMessages();
-		
+
 		messages.add(sendMessage);
 		vo.setMessages(messages);
 		rooms.put(roomId, vo);
-		
+
 		update();
 	}
 
@@ -255,7 +289,7 @@ public class ServerReceive extends Receive implements Runnable {
 	private synchronized void messageSetting(String key) {
 		try {
 			for (String message : messages) {
-				if(message.contains("output/")) {
+				if (message.contains("output/")) {
 					Thread setMessage = new Thread(new Send(clients.get(key), message + "@update/img"));
 					setMessage.start();
 					setMessage.join();
